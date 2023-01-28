@@ -131,8 +131,23 @@ function Register-TokenManipulator{
 }
 
 
-
-
+function Get-PrivilegeList {
+    [CmdletBinding(SupportsShouldProcess)]
+    param()
+  
+  $List = @("SeAssignPrimaryTokenPrivilege", "SeAuditPrivilege", "SeBackupPrivilege",
+            "SeChangeNotifyPrivilege", "SeCreateGlobalPrivilege", "SeCreatePagefilePrivilege",
+            "SeCreatePermanentPrivilege", "SeCreateSymbolicLinkPrivilege", "SeCreateTokenPrivilege",
+            "SeDebugPrivilege", "SeEnableDelegationPrivilege", "SeImpersonatePrivilege", "SeIncreaseBasePriorityPrivilege",
+            "SeIncreaseQuotaPrivilege", "SeIncreaseWorkingSetPrivilege", "SeLoadDriverPrivilege",
+            "SeLockMemoryPrivilege", "SeMachineAccountPrivilege", "SeManageVolumePrivilege",
+            "SeProfileSingleProcessPrivilege", "SeRelabelPrivilege", "SeRemoteShutdownPrivilege",
+            "SeRestorePrivilege", "SeSecurityPrivilege", "SeShutdownPrivilege", "SeSyncAgentPrivilege",
+            "SeSystemEnvironmentPrivilege", "SeSystemProfilePrivilege", "SeSystemtimePrivilege",
+            "SeTakeOwnershipPrivilege", "SeTcbPrivilege", "SeTimeZonePrivilege", "SeTrustedCredManAccessPrivilege",
+            "SeUndockPrivilege", "SeUnsolicitedInputPrivilege", "SeIncreaseQuotaPrivilege")
+  $List
+}
 
 
 <#
@@ -150,32 +165,126 @@ function Set-Privilege {
     param(
         ## The privilege to adjust. This set is taken from
         ## http://msdn.microsoft.com/en-us/library/bb530716(VS.85).aspx
-        [ValidateSet(
-            "SeAssignPrimaryTokenPrivilege", "SeAuditPrivilege", "SeBackupPrivilege",
-            "SeChangeNotifyPrivilege", "SeCreateGlobalPrivilege", "SeCreatePagefilePrivilege",
-            "SeCreatePermanentPrivilege", "SeCreateSymbolicLinkPrivilege", "SeCreateTokenPrivilege",
-            "SeDebugPrivilege", "SeEnableDelegationPrivilege", "SeImpersonatePrivilege", "SeIncreaseBasePriorityPrivilege",
-            "SeIncreaseQuotaPrivilege", "SeIncreaseWorkingSetPrivilege", "SeLoadDriverPrivilege",
-            "SeLockMemoryPrivilege", "SeMachineAccountPrivilege", "SeManageVolumePrivilege",
-            "SeProfileSingleProcessPrivilege", "SeRelabelPrivilege", "SeRemoteShutdownPrivilege",
-            "SeRestorePrivilege", "SeSecurityPrivilege", "SeShutdownPrivilege", "SeSyncAgentPrivilege",
-            "SeSystemEnvironmentPrivilege", "SeSystemProfilePrivilege", "SeSystemtimePrivilege",
-            "SeTakeOwnershipPrivilege", "SeTcbPrivilege", "SeTimeZonePrivilege", "SeTrustedCredManAccessPrivilege",
-            "SeUndockPrivilege", "SeUnsolicitedInputPrivilege", "SeIncreaseQuotaPrivilege")]
-        $Privilege,
-        ## The process on which to adjust the privilege. Defaults to the current process.
-        ## Switch to disable the privilege, rather than enable it.
-        [Switch] $Disable
+        [parameter(ParameterSetName = 'Privilege', position = 0)]
+        [ArgumentCompleter( {
+            param($Command, $Parameter, $WordToComplete, $CommandAst, $FakeBoundParams)
+            switch ($Parameter) {
+                'Privilege' {
+                    if ([string]::IsNullOrEmpty($WordToComplete)) {
+
+                        Get-PrivilegeList
+                    }
+                    else {
+                       # Write-Host "ArgumentCompleter Parameter $Parameter WordToComplete $WordToComplete CommandAst $CommandAst"
+                        Get-PrivilegeList | Where-Object { $_.StartsWith($WordToComplete) }
+                    }
+                }
+                Default {
+                }
+            }
+        })]
+
+        $Privilege
     )
 
     Register-TokenManipulator
+
+    $PCheck = Get-WhoamiPrivileges $Privilege
+    if($PCheck -eq $Null){ throw "USer doesnt have privilege $Privilege"}
     
     if($Disable){
         Write-Verbose "Removing Privilege $Privilege" 
-        [TokenManipulator]::RemovePrivilege($Privilege)    
+        [void][TokenManipulator]::RemovePrivilege($Privilege)    
     }else{
         Write-Verbose "ADding Privilege $Privilege" 
-        [TokenManipulator]::AddPrivilege($Privilege)    
+        [void][TokenManipulator]::AddPrivilege($Privilege)    
     }
     
+}
+
+
+function Get-WhoamiPrivileges{
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        ## The privilege to adjust. This set is taken from
+        ## http://msdn.microsoft.com/en-us/library/bb530716(VS.85).aspx
+        [Parameter(Mandatory = $false)]
+        $PrivilegeFilter=0
+    )
+    
+    $whoamicmd = Get-Command 'whoami.exe'
+    if (!($whoamicmd)) { throw "cannot find whoami" } 
+    $whoamiexe = $whoamicmd.Source 
+    $Privs = &"$whoamiexe" "/priv"
+    $i = 0
+    ForEach($l in $Privs){
+      $i++
+      if($l.Contains("===")){
+        $i1 = $l.IndexOf(" ")
+        $i2 = $l.LastIndexOf(" ")
+        $skip = $i
+      }
+      
+    }
+    $Pdata = $Privs | select -Skip $skip
+    [System.Collections.ArrayList]$PrivilegeList = [System.Collections.ArrayList]::new()
+    ForEach($l in $Pdata){
+      $privilege = $l.Substring(0,$i1).Trim()
+      $state = $l.Substring($i2).Trim()
+      Write-Verbose "$privilege => $state"
+      $o = [PsCustomObject]@{
+        Privilege = $privilege 
+        State = $state 
+      }
+      if($PrivilegeFilter -ne ""){
+        if($privilege.ToLower().Contains($PrivilegeFilter.ToLower())){
+          [void]$PrivilegeList.Add($o)
+        }
+      }else{
+        [void]$PrivilegeList.Add($o)
+      }
+    }
+    $PrivilegeList
+}
+
+
+
+function Get-PrivilegeState{
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        ## The privilege to adjust. This set is taken from
+        ## http://msdn.microsoft.com/en-us/library/bb530716(VS.85).aspx
+        [parameter(ParameterSetName = 'Privilege', position = 0)]
+        [ArgumentCompleter( {
+            param($Command, $Parameter, $WordToComplete, $CommandAst, $FakeBoundParams)
+            switch ($Parameter) {
+                'Privilege' {
+                    if ([string]::IsNullOrEmpty($WordToComplete)) {
+
+                        Get-PrivilegeList -replace '(.*\s.*)',"'`$1'"
+                    }
+                    else {
+                       # Write-Host "ArgumentCompleter Parameter $Parameter WordToComplete $WordToComplete CommandAst $CommandAst"
+                        Get-PrivilegeList -replace '(.*\s.*)',"'`$1'" | Where-Object { $_.StartsWith($WordToComplete) }
+                    }
+                }
+                Default {
+                }
+            }
+        })]
+        [String]$Privilege
+    )
+
+    $Pdata = Get-WhoamiPrivileges
+    ForEach($p in $Pdata){
+      if($p.Privilege -eq $Privilege){
+        return $p.State
+      }
+    }
+    ForEach($p in $Pdata){
+      if($p.Privilege -match $Privilege){
+        Write-Warning "Privilege '$Privilege' not found. Do you mean '$($p.Privilege)' ?" 
+      }
+    }
+    return "NOT_OWNED"
 }
