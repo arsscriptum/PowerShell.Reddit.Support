@@ -110,56 +110,65 @@ function Export-DesktopProperties{
         [string]$Path="$PSScriptRoot\DesktopProperties.xml"
     )
   
-
+    try{
     if (!("WindowPropertiesExporter" -as [type])) {
-        Write-Verbose "Registering WindowPropertiesExporter... " 
-        Add-Type -TypeDefinition "$CsSource"
-    }else{
-        Write-Verbose "WindowPropertiesExporter already registered " 
-    }
-
-    $PropertyList = [System.Collections.ArrayList]::new()
-    Get-WindowProcesses | ForEach-Object {
-        $ps = $_
-        [string]$psname = $ps.ProcessName
-        if ($ps.MainWindowHandle -ne 0) {
-    
-
-            $Rectangle = New-Object WinRect
-            [WindowPropertiesExporter]::GetWindowRect($ps.MainWindowHandle,[ref]$Rectangle) | Out-Null
-           
-            If ($Rectangle.Top    -lt 0 -AND 
-                $Rectangle.Bottom -lt 0 -AND
-                $Rectangle.Left   -lt 0 -AND
-                $Rectangle.Right  -lt 0) {
- 
-                [void] [WindowPropertiesExporter]::SetForegroundWindow($ps.MainWindowHandle)
-                #[void] [WindowPropertiesExporter]::ShowWindow($ps.MainWindowHandle, 3)
-                [WindowPropertiesExporter]::GetWindowRect($ps.MainWindowHandle,[ref]$Rectangle) | Out-Null
-                Write-Warning "$($_.ProcessName) SetForegroundWindow"
-            }
-            [int]$Height      = $Rectangle.Bottom - $Rectangle.Top
-            [int]$Width       = $Rectangle.Right  - $Rectangle.Left
-          
-            [WindowCoords]$TopLeft     = [WindowCoords]::new($Rectangle.Left , $Rectangle.Top)
-            [WindowCoords]$BottomRight = [WindowCoords]::new($Rectangle.Right , $Rectangle.Bottom)
-
-            [WindowProperties]$props = [WindowProperties]::new($ps.ProcessName, 
-                $TopLeft, 
-                $BottomRight, 
-                $Height, 
-                $Width, 
-                $Rectangle.Left, 
-                $Rectangle.Top, 
-                $Rectangle.Right, 
-                $Rectangle.Bottom)
-            [void]$PropertyList.Add($props)
-        
+            Write-Verbose "Registering WindowPropertiesExporter... " 
+            Add-Type -TypeDefinition "$CsSource"
+        }else{
+            Write-Verbose "WindowPropertiesExporter already registered " 
         }
-    }
 
-    Export-CliXml -Path $Path -InputObject $PropertyList
-    Write-Host "All windows properties saved to $Path" 
+        $PropertyList = [System.Collections.ArrayList]::new()
+        Get-WindowProcesses | ForEach-Object {
+            $ps = $_
+            [string]$psname = $ps.ProcessName
+            if ($ps.MainWindowHandle -ne 0) {
+        
+                $Rectangle = New-Object WinRect
+                [WindowPropertiesExporter]::GetWindowRect($ps.MainWindowHandle,[ref]$Rectangle) | Out-Null
+               
+                # If the Window position is invalid, it probably means it is minimized, so to get the correct coordinates
+                # we will set the focus on the app temporarly and call GetWindowRect again.
+                If ($Rectangle.Top    -lt 0 -AND 
+                    $Rectangle.Bottom -lt 0 -AND
+                    $Rectangle.Left   -lt 0 -AND
+                    $Rectangle.Right  -lt 0) {
+     
+                    [void] [WindowPropertiesExporter]::SetForegroundWindow($ps.MainWindowHandle)
+
+                    # SW_RESTORE (9)
+                    # Activates and displays the window. If the window is minimized or maximized, 
+                    # the system restores it to its original size and position. An application should specify this flag when restoring a minimized window.
+                    [void] [WindowPropertiesExporter]::ShowWindow($ps.MainWindowHandle, 9)
+
+                    [WindowPropertiesExporter]::GetWindowRect($ps.MainWindowHandle,[ref]$Rectangle) | Out-Null
+                    Write-Warning "$($_.ProcessName) SetForegroundWindow"
+                }
+                [int]$Height      = $Rectangle.Bottom - $Rectangle.Top
+                [int]$Width       = $Rectangle.Right  - $Rectangle.Left
+              
+                [WindowCoords]$TopLeft     = [WindowCoords]::new($Rectangle.Left , $Rectangle.Top)
+                [WindowCoords]$BottomRight = [WindowCoords]::new($Rectangle.Right , $Rectangle.Bottom)
+
+                [WindowProperties]$props = [WindowProperties]::new($ps.ProcessName, 
+                    $TopLeft, 
+                    $BottomRight, 
+                    $Height, 
+                    $Width, 
+                    $Rectangle.Left, 
+                    $Rectangle.Top, 
+                    $Rectangle.Right, 
+                    $Rectangle.Bottom)
+                [void]$PropertyList.Add($props)
+            
+            }
+        }
+
+        Export-CliXml -Path $Path -InputObject $PropertyList
+        Write-Host "All windows properties saved to $Path" 
+    }catch{
+        Write-Error "$_"
+    }
 }
 
 function Import-DesktopProperties{
@@ -169,36 +178,42 @@ function Import-DesktopProperties{
         [Parameter(Mandatory = $false)]
         [string]$Path="$PSScriptRoot\DesktopProperties.xml"
     )
-  
 
-    if (!("WindowPropertiesExporter" -as [type])) {
-        Write-Verbose "Registering WindowPropertiesExporter... " 
-        Add-Type -TypeDefinition "$CsSource"
-    }else{
-        Write-Verbose "WindowPropertiesExporter already registered " 
-    }
+    try{
+        if(-not (Test-Path $Path -PathType Leaf)){ throw "No such file $Path" }
+      
 
-    Write-Host "Import all windows properties"
-    $PropertyList = Import-CliXml -Path $Path 
-
-    ForEach($prop in $PropertyList){
-        Write-Verbose "Search $($prop.Name)..." 
-        $ps = Get-WindowProcesses | Where ProcessName -eq $prop.Name | Select -Unique
-        if($ps -ne $Null){
-            Write-Verbose "found $Name " 
-            $Handle = $ps.MainWindowHandle
-            if ( $Handle -eq [System.IntPtr]::Zero ) { return }
-            $Rectangle = New-Object WinRect
-            $Null = [WindowPropertiesExporter]::GetWindowRect($Handle,[ref]$Rectangle)
-            
-            Write-Verbose "setting properties... pos x $x, pos y $y, width $w, height $h" 
-            [int]$x = $prop.Left
-            [int]$y = $prop.Top
-            [int]$w = $prop.Width
-            [int]$h = $prop.Height
-            [void][WindowPropertiesExporter]::MoveWindow($Handle, $x, $y, $w, $h, $true)
-            [void] [WindowPropertiesExporter]::SetForegroundWindow($Handle) 
+        if (!("WindowPropertiesExporter" -as [type])) {
+            Write-Verbose "Registering WindowPropertiesExporter... " 
+            Add-Type -TypeDefinition "$CsSource"
+        }else{
+            Write-Verbose "WindowPropertiesExporter already registered " 
         }
+
+        Write-Host "Import all windows properties"
+        $PropertyList = Import-CliXml -Path $Path 
+
+        ForEach($prop in $PropertyList){
+            Write-Verbose "Search $($prop.Name)..." 
+            $ps = Get-WindowProcesses | Where ProcessName -eq $prop.Name | Select -Unique
+            if($ps -ne $Null){
+                Write-Verbose "found $Name " 
+                $Handle = $ps.MainWindowHandle
+                if ( $Handle -eq [System.IntPtr]::Zero ) { continue; }
+                
+                [int]$x = $prop.Left
+                [int]$y = $prop.Top
+                [int]$w = $prop.Width
+                [int]$h = $prop.Height
+
+                Write-Verbose "setting properties... pos x $x, pos y $y, width $w, height $h" 
+
+                [void][WindowPropertiesExporter]::MoveWindow($Handle, $x, $y, $w, $h, $true)
+                [void] [WindowPropertiesExporter]::SetForegroundWindow($Handle) 
+            }
+        }
+    }catch{
+        Write-Error "$_"
     }
 
 }
@@ -206,21 +221,24 @@ function Import-DesktopProperties{
 
 function Get-WindowProcesses{
     [CmdletBinding(SupportsShouldProcess)]
-    Param
-    ()
+    Param()
 
-    $ProcessesList = [System.Collections.ArrayList]::new()
-    $Processes = Get-Process
-    ForEach($ps in $Processes){
-        $MainWindowTitle = $ps.MainWindowTitle.Trim()
-        $PsPath = $ps.Path
-        if([string]::IsNullOrEmpty($MainWindowTitle)){continue;}    # Don't get processes with empty MainWindowTitle
-        if($PsPath.StartsWith("C:\Windows\system32")){continue;}    # Don't get processes located in system32
-        if($PsPath.StartsWith("C:\Windows\SystemApps")){continue;}  # Don't get processes located in SystemApps
-        [void]$ProcessesList.Add($ps)
+    try{
+        $ProcessesList = [System.Collections.ArrayList]::new()
+        $Processes = Get-Process | Select -Unique
+        ForEach($ps in $Processes){
+            $MainWindowTitle = $ps.MainWindowTitle.Trim()
+            $PsPath = $ps.Path
+            if([string]::IsNullOrEmpty($MainWindowTitle)){continue;}    # Don't get processes with empty MainWindowTitle
+            if($PsPath.StartsWith("C:\Windows\system32")){continue;}    # Don't get processes located in system32
+            if($PsPath.StartsWith("C:\Windows\SystemApps")){continue;}  # Don't get processes located in SystemApps
+            [void]$ProcessesList.Add($ps)
 
+        }
+        $ProcessesList
+    }catch{
+        Write-Error "$_"
     }
-    $ProcessesList
 }
 
 
