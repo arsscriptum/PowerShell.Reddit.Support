@@ -180,7 +180,7 @@ function Import-DesktopProperties{
 
     Write-Host "Import all windows properties"
     $PropertyList = Import-CliXml -Path $Path 
-    $PropertyListCount = $PropertyList.Count
+
     ForEach($prop in $PropertyList){
         Write-Verbose "Search $($prop.Name)..." 
         $ps = Get-WindowProcesses | Where ProcessName -eq $prop.Name | Select -Unique
@@ -214,9 +214,9 @@ function Get-WindowProcesses{
     ForEach($ps in $Processes){
         $MainWindowTitle = $ps.MainWindowTitle.Trim()
         $PsPath = $ps.Path
-        if([string]::IsNullOrEmpty($MainWindowTitle)){continue;}
-        if($PsPath.StartsWith("C:\Windows\system32")){continue;}
-        if($PsPath.StartsWith("C:\Windows\SystemApps")){continue;}
+        if([string]::IsNullOrEmpty($MainWindowTitle)){continue;}    # Don't get processes with empty MainWindowTitle
+        if($PsPath.StartsWith("C:\Windows\system32")){continue;}    # Don't get processes located in system32
+        if($PsPath.StartsWith("C:\Windows\SystemApps")){continue;}  # Don't get processes located in SystemApps
         [void]$ProcessesList.Add($ps)
 
     }
