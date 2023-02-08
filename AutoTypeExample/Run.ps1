@@ -25,10 +25,13 @@ Cells - Interlinked Interlinked
 Within cells interlinked - within cells interlinked - within cells interlinked
 "@
 
-$BatchFile = "$PSScriptRoot\program.bat"
-$CmdExe = "$ENV:ComSpec"
 
 
+function Invoke-BaselineTest{
+
+    try{
+        $BatchFile = "$PSScriptRoot\program.bat"
+        $CmdExe = "$ENV:ComSpec"
 
         Add-Type -AssemblyName System.Windows.Forms    
         $screens = [System.Windows.Forms.SystemInformation]::VirtualScreen    
@@ -65,4 +68,10 @@ $CmdExe = "$ENV:ComSpec"
         [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
         Start-Sleep 2
         [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
-       
+    }catch {
+        Write-Error "$_"
+    }
+
+}
+
+Invoke-BaselineTest
