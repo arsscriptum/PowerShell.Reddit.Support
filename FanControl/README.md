@@ -46,3 +46,12 @@ Here are the functions I implemented in PowerShell:
 - Set-FcConfig
 - Set-FcAutoConfig
 
+
+
+## PowerShell GUI Application Version
+
+I now just remembered there was more code I wrote relating the the fan control. I was drunk or high and forgot about it. I just re-discovered this beauty.
+
+If you are interested, I could dust it off and sent it your way
+
+![GuiVersion](https://raw.githubusercontent.com/arsscriptum/PowerShell.Reddit.Support/master/FanControl/img/fancontrolform.png)
