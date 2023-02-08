@@ -26,3 +26,23 @@ For the PowerShell side, I didn't over-engineer the shit:
 - I basically have a wrapper on top of ```nbfc.exe``` the NoteBook FanControl CLI client.
 - I also parse the output of the ```nbfc.exe``` program.
 
+
+## FanControl.ps1
+
+Get my [script here](https://github.com/arsscriptum/PowerShell.Reddit.Support/blob/master/FanControl/FanControl.ps1)
+
+Here are the functions I implemented in PowerShell:
+
+- Set-FanSpeed  <<< this is what you want
+- Stop-FcService
+- Start-FcService
+- Get-NotebookFanControlPath
+- Get-NotebookFanControlExe
+- Push-NotebookFanControlPath
+- Get-FcStatus
+- Get-FcTemperature
+- Get-FcServiceStatus
+- Test-Fconfig
+- Set-FcConfig
+- Set-FcAutoConfig
+
