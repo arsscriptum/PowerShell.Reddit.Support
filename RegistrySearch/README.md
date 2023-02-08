@@ -1,4 +1,4 @@
-# Fan Control using PowerShell
+# Search the registry for KeyName, PropertyName, PropertyValue or a combination of the above.
 
 From [this post](https://www.reddit.com/r/PowerShell/comments/10x4ff6/help_finding_and_deleting_reg_entry_with_specific/) where a user named [frermanisawesome](https://www.reddit.com/user/frermanisawesome/) inquired about a method
 to search the registry to find and deleting reg entry with specific data value.
