@@ -8,7 +8,7 @@ function Get-AclProperties{
     param(
         [Parameter(Mandatory=$true)]
         [string[]]$Paths,
-        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Permissions")]
+        [Parameter(Mandatory=$false, HelpMessage="Permissions")]
         [string[]]$Permissions=@('Modify','FullControl','Write')
     )
 
