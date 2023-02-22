@@ -40,21 +40,23 @@ function Test-RegExPattern{
 
 function Get-CsvOutput{
 
+    # create a regex pattern to parse the path with hostname and the username...
     [regex]$regexpattern = [regex]::new('([\\]+)(?<HostName>[\w]+)([\\]+)(?<Drive>[c$]+)([\\Users]+)(?<Username>[\w]+)([\\]+)(?<FilePath>[AppData\\Roaming\\Zoom\\bin\\Zoom.exe]+)')
-
-    # HEADER STRING
+ 
     $StrHeaderOut = "{0}, {1}`n" -f 'HostName', 'Username'
     $CsvData += $StrHeaderOut
-    foreach ( $i in $Script:PathList ) {
-        $MatchDetected = $i -match $regexpattern
+    
+    foreach ( $i in $PathList ) {                       # loop in the path list to find matches
+        $MatchDetected = $i -match $regexpattern        # use the regex variable to find matches
         if($MatchDetected -eq $True){
-            $HostName = $Matches.HostName
-            $Username = $Matches.Username
-            $StrDataOut = "{0}, {1}`n" -f $HostName, $Username
-            $CsvData += $StrDataOut
+            $HostName = $Matches.HostName               # if match found, retrieve the hostname
+            $Username = $Matches.Username               # if match found, retrieve the username
+            $StrDataOut = "{0}, {1}`n" -f $HostName, $Username      # create a simple string
+            $CsvData += $StrDataOut                     # add the string to the total csv data
         }
     }
     $CsvData
 }
+
 
 Get-CsvOutput
