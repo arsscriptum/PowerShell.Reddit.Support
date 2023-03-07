@@ -548,8 +548,7 @@ function Test-IsNativeProgressModuleLoaded{
         $Loaded = Test-NativeProgressModuleDependencies
         $Loaded
     }catch [Exception]{
-        Write-Error "$_"
-    }
+3    }
     return $null
 }
 
