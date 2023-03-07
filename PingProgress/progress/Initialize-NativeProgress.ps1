@@ -538,34 +538,6 @@ function Get-NativeProgressModulesVariableIndex{
     return $null
 }
 
-function Initialize-NativeProgressModule{
-
-    [CmdletBinding(SupportsShouldProcess)]
-    param(    
-        [Parameter(Mandatory=$false, HelpMessage="NoLoad")]
-        [Switch]$LoadModules
-    ) 
-  
-    try{
-        Write-Host "================================================================" -f DarkYellow
-        Write-Host "              Initialize-NativeProgressModule                   " -f DarkRed
-        Write-Host "================================================================" -f DarkYellow
-
-        Write-NativeProgressModuleStates
-
-        Remove-NativeProgressModules
-
-        New-NativeProgressAssembly -LoadModules:$LoadModules
- 
-
-        Write-NativeProgressModuleStates
-
-
-    }catch [Exception]{
-        Write-Error "$_"
-    }
-    return $null
-}
 
 function Test-IsNativeProgressModuleLoaded{
 
