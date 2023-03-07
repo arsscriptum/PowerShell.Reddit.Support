@@ -4,4 +4,4 @@ The goal was to add a progress bar while the ping are executing in the backgroun
 
 I added my custom ascii progress bar for a reddit user
 
-![]DEMO(https://github.com/arsscriptum/PowerShell.Reddit.Support/blob/master/PingProgress/gif/demo.gif)
+![DEMO](https://github.com/arsscriptum/PowerShell.Reddit.Support/blob/master/PingProgress/gif/demo.gif)
