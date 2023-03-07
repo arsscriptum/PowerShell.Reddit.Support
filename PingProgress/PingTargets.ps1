@@ -1,4 +1,8 @@
 
+    # ==========================================================================================
+    # SIMPLE SCRIPT BLOCK IMPLEMENTING THE NETWORK CONNECTION TEST LOGIC
+    # REFER TO SECTION 3 AT THE BOTTOM OF THIS FILE TO VIEW HOW THIS SCRIPT IS USED
+    # ==========================================================================================
 
     $NetTestScript = {
         Param (
@@ -25,53 +29,54 @@
             }
 
         }catch{
-            Show-ExceptionDetails $_ -ShowStack
+            Write-Error "$_"
         }
     }
 
 
+    # ==========================================================================================
+    # CUSTOM RECEIVE-JOB FUNCTION IMPLEMENTED TO PROCESS THE NETWORK CONNECTION TEST JOBS
+    # ==========================================================================================
 
 
     function Receive-PingJob{
         [CmdletBinding(SupportsShouldProcess)]
         param(
             [Parameter(Mandatory=$false, HelpMessage="JobName", Position=0)]
-            [string]$JobName="ConnTest"
+            [string]$JobName="NetworkPingJobs"
         )
 
         try{
             Register-NativeProgressBar -Size 30
             $PipelineOutput = @()
-            $Transferring = $True
-            $JobState = (Get-Job -Name $JobName).State
+            $ReceivingPingData = $True
+
             Write-verbose "JobState: $JobState"
             $RcvQueue = New-Object System.Collections.Queue
             $ProgressTitle = "MODE: PING $JobName"
-            while($Transferring){
+            while($ReceivingPingData){
                 Start-Sleep -Millisecond 500
                 
                 $JobData = Get-Job -Name $JobName
                 $JobState = $JobData.State
                 $JobHasMoreData = $JobData.HasMoreData 
                 $RcvQueueCount = $RcvQueue.Count
-
+                
+                # Check if we stay in the processing loop:
+                # - Verify the Job state (Completed or not)
+                # - Verify if the job still has more data in the receie queue to be captured
+                # - Check the incoming receive queue size. If there are still items to be processed (dequeued) we are not done
                 if( $JobState -eq 'Completed') {
                     if(( $RcvQueueCount -le 0) -And ($JobHasMoreData -eq $False)){
                         Write-verbose "STOPPING TRANSFERRING, EXIT NEXT LOOOP"
-                        $Transferring = $False
+                        $ReceivingPingData = $False
                     }
                 }
-                $slog = @"
-=====================================
-JobState = $JobState
-JobHasMoreData $JobHasMoreData
-Transferring $Transferring
-RcvQueueCount = $RcvQueueCount
-=====================================
-"@
-                Write-verbose $slog
+
+                # This gets data outputed from the jobs and store them in an array temporarly
                 $Output = Receive-Job -Name $JobName
 
+                # We then take each item separately and queue them in a FIFO queue for processing
                 if($Output -ne $Null){
                     ForEach($data in $Output){
                         Write-verbose "Received New Data, Add to Queue"
@@ -79,6 +84,8 @@ RcvQueueCount = $RcvQueueCount
                     }
                 }
                 
+                # ======================
+                # PROCESSING STARTS HERE
                 try{
                     Write-verbose "DeQueue Data"
                     $line_out = $RcvQueue.Dequeue()
@@ -88,19 +95,14 @@ RcvQueueCount = $RcvQueueCount
                     Write-verbose "DeQueue Data is null"
                     continue;
                 }
+
+                # The data outputed from jobs is a custom object encoded in json. We recreate the pscustomoject here. 
                 $progress = $line_out | ConvertFrom-Json
+
                 $Hostname = $progress.ComputerName
                 $Success = $progress.Success
                 $progress_percentage = $progress.percentage
 
-                $slog = @"
-=====================================
-Hostname = $Hostname
-Success $Success
-Percentage = $progress_percentage
-=====================================
-"@
-                Write-verbose $slog
                 if([string]::IsNullOrEmpty($Hostname)){
                     Write-verbose "Hostname: NULL, continue"
                     continue;
@@ -124,7 +126,6 @@ Percentage = $progress_percentage
 
                 $PipelineOutput += "$HostnameWide`t$SuccessWide`t( $progress_percentage % )"
 
-
                 Write-NativeProgressBar $progress_percentage $ProgressMessage 50 2 "White" "DarkGray"
             }
             
@@ -132,12 +133,15 @@ Percentage = $progress_percentage
             cls
             $PipelineOutput
         }catch{
-            Show-ExceptionDetails $_ -ShowStack
+            Write-Error "$_"
         }
     }
 
 
 
+    # ==========================================================================================
+    # SECTION 1 : IMPORT SCRIPTS FOR PROGRESS BAR
+    # ==========================================================================================
 
     Write-Host "================================================================" -f DarkYellow
     Write-Host "                        IMPORTING SCRIPTS                       " -f DarkRed
@@ -165,8 +169,37 @@ Percentage = $progress_percentage
         return
     }
 
-    $Loaded = Test-NativeProgressModuleDependencies
-    if($Loaded -eq $False){
+    cls
+
+    # ==========================================================================================
+    # SECTION 2 : LOAD CUSTOM MODULE FOR PROGRESS BAR
+    # ==========================================================================================
+
+    Write-Host "================================================================" -f DarkCyan
+    Write-Host "                           NOW LOADING                          " -f Magenta
+    Write-Host "                    THE PROGRESS BAR MODULE                     " -f Magenta
+    Write-Host "                      NATIVE DEPENDENCIES                       " -f Magenta
+    Write-Host "================================================================" -f DarkCyan
+
+    # Global boolean flag set after initializAtion
+    [bool]$NativeModuleTestInitialized = (Get-Variable -Name "NativeModuleTestInitialized" -ValueOnly -Scope Global -ErrorAction Ignore) -ne $Null
+    # A Cmdlet pointer, that is availabl when the required module is loaded
+    $FunctionPtr = (Get-Command "Write-NativeProgressBar" -ErrorAction Ignore)
+    [bool]$ModuleFunctionValid = $FunctionPtr -ne $Null
+    # Checking both flags defined above. We are loaded when both are in agreementg.
+    [bool]$ModuleInitialized = ($NativeModuleTestInitialized -eq $True) -And ($ModuleFunctionValid -eq $True)
+
+    Write-Host "`n"
+    Write-Host "================================================================" -f DarkCyan
+    Write-Host "                   VERIFICATION OF CURRENT STATE        " -f DarkYellow
+    Write-Host "================================================================" -f DarkCyan
+    Write-Host "Native Module Test Initialized    = $NativeModuleTestInitialized" -f DarkCyan
+    Write-Host "Write-NativeProgressBar Valid     = $ModuleFunctionValid" -f DarkCyan
+    Write-Host "Initialization Flag + Function    = $ModuleInitialized" -f DarkRed
+    Write-Host "`n"
+
+
+    if($ModuleInitialized -eq $False){
         New-NativeProgressAssembly -LoadModules
     }
 
@@ -176,17 +209,25 @@ Percentage = $progress_percentage
         return
     }
 
+
+
+
+
+    # ==========================================================================================
+    # SECTION 3 : ACTUAL PING CODE - THE CONNECTION TEST
+    # ==========================================================================================
+
     Write-Host "`n`n"
-    Write-Host "================================================================" -f DarkYellow
-    Write-Host "                      PRESS A KEY TO START                      " -f DarkRed
-    Write-Host "================================================================" -f DarkYellow
+
+    Write-Host "`t`t`t`t`tPRESS A KEY TO START" -f DarkRed
+    Write-Host "`t`t`t`t`t--------------------" -f DarkRed
 
     Read-Host " . "
     cls
     [scriptblock]$NetTestScriptBlock = [scriptblock]::create($NetTestScript) 
 
-    $jobby = Start-Job -Name "ConnTest" -ScriptBlock $NetTestScriptBlock -ArgumentList ("F:\Scripts\PowerShell.Reddit.Support\PingProgress\Computers.txt")
-    Receive-PingJob -JobName "ConnTest"
-
+    $DefaultJobName = "NetworkPingJobs"
+    $jobby = Start-Job -Name "$DefaultJobName" -ScriptBlock $NetTestScriptBlock -ArgumentList ("F:\Scripts\PowerShell.Reddit.Support\PingProgress\Computers.txt")
+    Receive-PingJob -JobName "$DefaultJobName"
 
 

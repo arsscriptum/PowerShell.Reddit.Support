@@ -181,14 +181,16 @@ function Remove-NativeProgressModules{
             Write-Host "$_" -f DarkYellow
             $Script:ErrorOccured = $True
         }
-        [System.Collections.ArrayList]$NativeProgressModules = Get-Variable -Name "NativeProgressModules" -ValueOnly -Scope Global -ErrorAction Ignore
-        if($NativeProgressModules -ne $Null){
+        try{
+            $NativeProgressModules = Get-Variable -Name "NativeProgressModules" -ValueOnly -Scope Global -ErrorAction Stop
             $NativeProgressModulesCount = $NativeProgressModules.Count 
             Write-Host "`t[OK]`t" -f DarkGreen -NoNewLine
             Write-Host "Clearing  `"NativeProgressModules`" variable. Count of $NativeProgressModulesCount" -f Gray
             $NativeProgressModules.Clear()
+        }catch{
+            $NativeProgressModulesCount = $Null
         }
-        
+
         [System.Collections.ArrayList]$NativeProgressModules = [System.Collections.ArrayList]::new()
         Set-Variable -Name "NativeProgressModules" -Value $NativeProgressModules -Option AllScope -Force -Visibility Public -Scope Global -ErrorAction Ignore
         Write-Host "`t[OK]`t" -f DarkGreen -NoNewLine
@@ -278,15 +280,16 @@ function New-NativeProgressAssembly{
         New-Item "$destDll" -ItemType file -Force -ErrorAction Ignore | Out-Null
         Remove-Item "$destDll" -Recurse -Force -ErrorAction Ignore | Out-Null
         Write-Host "`t[OK]`t" -f DarkGreen -NoNewLine
-        Write-Host "Copy DLL `"$PSScriptRoot\lib\NativeProgressBar.dll`" ==> `"$destDll`"" -f DarkGray
+        Write-Host "Copy DLL content `"$PSScriptRoot\lib\NativeProgressBar.dll`" ==> `"$destDll`""
         $NewDll = Copy-Item "$PSScriptRoot\lib\NativeProgressBar.dll" "$destDll" -Force -Passthru
 
         if($LoadModules){
 
-            Write-Host "Loading DLL `"$NewDll`" " -f red
+            Write-Host "`t[OK]`t" -f DarkGreen -NoNewLine
+            Write-Host "Loading DLL content `"$NewDll`" " -f Yellow
             $assembly = [System.Reflection.Assembly]::LoadFile($NewDll)
             $assLoc = $assembly.Location
-
+            Write-Host "`n`n"
             Write-Host "================================================================" -f DarkYellow
             Write-Host "                           Import                               " -f DarkRed
             Write-Host "================================================================" -f DarkYellow
@@ -296,22 +299,33 @@ function New-NativeProgressAssembly{
             $NowTime = Get-Date 
             $NowTimeSeconds = ConvertTo-CTime($NowTime)
             Write-Host "`t[OK]`t" -f DarkGreen -NoNewLine
-            Write-Host "import-module -Assembly `"$assembly`"" -f red
-            $NewModule = import-module -Assembly $assembly -force -Passthru
+            Write-Host "import-module -Assembly `"$assembly`"" -f yellow
+            $NewModule = import-module -Assembly $assembly -DisableNameChecking -Force -Scope Global -PassThru -ErrorAction Ignore
+            if($NewModule -eq $Null) { throw "Error on module import!" }
             Write-Host "`t[OK]`t" -f DarkGreen -NoNewLine
-            Write-Host "Adding `"LoadTime`" property to module variable`nNowTimeSeconds = $NowTimeSeconds"
+            Write-Host "Adding `"LoadTime`" property to module variable`nNowTimeSeconds = $NowTimeSeconds" -f Gray
             Add-Member -InputObject $NewModule -MemberType NoteProperty -Name "LoadTime" -Value "$NowTimeSeconds"
             Write-Host "`t[OK]`t" -f DarkGreen -NoNewLine
-            Write-Host "Adding `"AssemblyLocation`" property to module variable.`n$assLoc"
+            Write-Host "Adding `"AssemblyLocation`" property to module variable.`n$assLoc" -f Gray
             Add-Member -InputObject $NewModule -MemberType NoteProperty -Name "AssemblyLocation" -Value "$assLoc"
 
-
+            Write-Host "`n`t[INFO]`t" -f Yellow -NoNewLine
+            Write-Host "Creating a new PsObject from the Module PsObject instance we just received." -f Gray
+            Write-Host "`t[INFO]`t" -f Yellow -NoNewLine
+            Write-Host "This new PsObject properties have been validated for exactitude of values, " -f Gray
+            Write-Host "`t[INFO]`t" -f Yellow -NoNewLine
+            Write-Host "strings whitespaces, etc, so value comparisons and processing will be solid`n" -f Gray
             $NewModuleObject = New-ModuleObject $NewModule
-            Write-ModuleObjectDump $NewModuleObject
 
-
+            if($Verbose){
+                Write-ModuleObjectDump $NewModuleObject
+            }
+            
             [void]$NativeProgressModules.Add($NewModuleObject)
             Set-Variable -Name "NativeProgressModules" -Value $NativeProgressModules -Option AllScope -Force -Visibility Public -Scope Global -ErrorAction Ignore
+
+            # Initialized Flag
+            Set-Variable -Name "NativeProgressModuleInitialized" -Value 1 -Option AllScope -Force -Visibility Public -Scope Global -ErrorAction Ignore
         }
     }catch [Exception]{
         Write-Error "$_"
