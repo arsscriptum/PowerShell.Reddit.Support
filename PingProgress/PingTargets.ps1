@@ -129,6 +129,7 @@ Percentage = $progress_percentage
             }
             
             Remove-Job -Name $JobName
+            cls
             $PipelineOutput
         }catch{
             Show-ExceptionDetails $_ -ShowStack
