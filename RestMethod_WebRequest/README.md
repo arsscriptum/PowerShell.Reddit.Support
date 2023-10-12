@@ -37,7 +37,7 @@ Let's use this function, which can get your external ip from ```https://api.ipif
 
         $FullUrl = "{0}?{1}" -f $BaseUrl, $FormatArgument
 
-        if($SimulateError -eq $True){
+        if($GetHtml -eq $True){
             $FullUrl = "https://arsscriptum.github.io/welcome.html"
         }
         if($Cmdlet -eq 'RestMethod'){
@@ -140,3 +140,43 @@ PS> Write-Host "my ip is $($JsonData.ip)" -f DarkCyan
 PS> SatusCode returned was 
 PS> my ip is 10.17.18.33
 ```
+
+
+## Here's where you'll see an issue
+
+
+Look at when you do a request and get HTML (which cannot be parsed by Inboke-RestMethod)
+
+```bash
+ PS> Get-MyIpTest RestMethod -Format csv -GetHtml
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>Guillaume Plante</ti
+```
+
+
+Look at when you do a request and get HTML which is parsed
+
+
+```bash
+ PS> Get-MyIpTest WebRequest -Format csv -GetHtml
+
+	PS> 
+	PS> StatusCode        : 200
+	PS> StatusDescription : OK
+	PS> Content           : {"ip":"10.1.1.1"}
+	PS> RawContent        : HTTP/1.1 200 OK
+	PS>                     Server: nginx/1.25.1
+	PS>                     Date: Thu, 12 Oct 2023 16:02:00 GMT
+	PS>                     Connection: keep-alive
+	PS>                     Vary: Origin
+	PS>                     Content-Type: application/json
+	PS>                     Content-Length: 23
+	PS> 
+```
+
+
